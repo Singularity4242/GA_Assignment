@@ -43,13 +43,11 @@ class VRP_GA_Solver:
 
         n_customers = len(self.customers)
 
+        #染色体编码方式
         def create_individual():
-            # 创建客户访问顺序的随机排列
-            customer_order = random.sample(range(n_customers), n_customers)
-            # 为每个客户随机分配仓库（0-4）
-            depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]
-            # 组合成完整个体
-            return customer_order + depot_assignments
+            customer_order = random.sample(range(n_customers), n_customers)     #客户顺序
+            depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]  #n个仓库顺序
+            return customer_order + depot_assignments #前n为客户顺序，后n为仓库顺序
 
         self.toolbox.register("individual", tools.initIterate, creator.Individual, create_individual)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -58,16 +56,11 @@ class VRP_GA_Solver:
         self.toolbox.register("mate", self._custom_crossover)
         self.toolbox.register("mutate", self._custom_mutation)
 
-    def _generate_stochastic_demand(self, mean_demand):
-        """
-        生成随机需求
-        N(mean_demand, 0.2 * mean_demand)，截断为正整数
-        """
-        std_dev = 0.2 * mean_demand
-        # 生成正态分布随机数
-        stochastic_demand = np.random.normal(mean_demand, std_dev)
-        # 截断为正整数
-        stochastic_demand = max(1, int(round(stochastic_demand)))
+    def _generate_demand(self, mean_demand):
+        #-----正态分布范围内生成需求-------
+        std_dev = 0.2 * mean_demand     #标准差
+        random_demand = np.random.normal(mean_demand, std_dev)      # 生成正态分布随机数
+        stochastic_demand = max(1, int(round(random_demand)))       # 截断为正整数
         return stochastic_demand
 
 
@@ -88,7 +81,7 @@ class VRP_GA_Solver:
         for i, customer_idx in enumerate(customer_order):
             # 生成随机需求
             mean_demand = self.customers.iloc[customer_idx]['DEMAND']
-            actual_demand = self._generate_stochastic_demand(mean_demand)
+            actual_demand = self._generate_demand(mean_demand)
 
             assigned_depot_no = depot_assignments[customer_idx]
             assigned_depot_idx = self.depot_indices[assigned_depot_no]
@@ -132,51 +125,6 @@ class VRP_GA_Solver:
             if is_feasible:
                 feasible_count += 1
 
-    # def _evaluate_route(self, individual):
-    #     """
-    #     多仓库单车辆VRP适应度评估
-    #     车辆从depot0出发，访问分配给各个仓库的客户，最后返回depot0
-    #     """
-    #     n_customers = len(self.customers)
-    #
-    #     # 解析个体：前半部分是客户顺序，后半部分是仓库分配
-    #     customer_order = individual[:n_customers]
-    #     depot_assignments = individual[n_customers:]
-    #
-    #     total_distance = 0
-    #     current_load = 0
-    #     depot_0_idx = self.depot_indices[0]  # 主仓库索引
-    #
-    #     # 从主仓库出发
-    #     current_position = depot_0_idx
-    #
-    #     # 按客户顺序访问，但需要根据仓库分配组织路线
-    #     for i, customer_idx in enumerate(customer_order):
-    #         assigned_depot_no = depot_assignments[customer_idx]
-    #         assigned_depot_idx = self.depot_indices[assigned_depot_no]
-    #         customer_demand = self.customers.iloc[customer_idx]['DEMAND']
-    #
-    #         # 检查如果服务这个客户是否会超载
-    #         if current_load + customer_demand > self.max_capacity:
-    #             # 超载，需要返回主仓库清空
-    #             total_distance += self.distance_matrix[current_position][depot_0_idx]
-    #             current_load = 0
-    #             current_position = depot_0_idx
-    #
-    #         # 如果当前不在客户分配的仓库区域，需要先去该仓库
-    #         if current_position != assigned_depot_idx and current_position != customer_idx:
-    #             total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-    #             current_position = assigned_depot_idx
-    #
-    #         # 从分配的仓库到客户
-    #         total_distance += self.distance_matrix[current_position][customer_idx]
-    #         current_load += customer_demand
-    #         current_position = customer_idx
-    #
-    #     # 最后返回主仓库
-    #     total_distance += self.distance_matrix[current_position][depot_0_idx]
-    #
-    #     return total_distance,
 
     def _custom_crossover(self, ind1, ind2):
         """自定义交叉操作"""
