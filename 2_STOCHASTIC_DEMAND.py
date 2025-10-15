@@ -9,7 +9,7 @@ from visualizer import VRPVisualizer
 from utils import EarlyStopper
 
 class VRP_GA_Solver:
-    # 为单辆车（容量200）寻找最优路线，服务100个客户
+
     def __init__(self):
         self.max_capacity = MAX_CAPACITY
 
@@ -32,7 +32,6 @@ class VRP_GA_Solver:
             threshold=CONVERGENCE_THRESHOLD,
             min_generations=MIN_GENERATIONS
         )
-
         # 设置遗传算法
         self._setup_ga()
 
@@ -44,10 +43,11 @@ class VRP_GA_Solver:
 
         n_customers = len(self.customers)
 
+        #染色体编码方式
         def create_individual():
             customer_order = random.sample(range(n_customers), n_customers)     #客户顺序
-            depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]      #仓库顺序
-            return customer_order + depot_assignments
+            depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]  #n个仓库顺序
+            return customer_order + depot_assignments #前n为客户顺序，后n为仓库顺序
 
         self.toolbox.register("individual", tools.initIterate, creator.Individual, create_individual)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -56,159 +56,107 @@ class VRP_GA_Solver:
         self.toolbox.register("mate", self._custom_crossover)
         self.toolbox.register("mutate", self._custom_mutation)
 
-    #适应度计算
-    def _evaluate_route(self, individual):
+    def _generate_demand(self, mean_demand):
+        #-----正态分布范围内生成需求-------
+        std_dev = 0.2 * mean_demand     #标准差
+        random_demand = np.random.normal(mean_demand, std_dev)      # 生成正态分布随机数
+        random_demand = max(1, int(round(random_demand)))       # 截断为正整数
+        return random_demand
 
+
+    def _evaluate_single_sample(self, individual):
+        # 适应度评估（单次随机需求）
         n_customers = len(self.customers)
-        # 一条染色体：前n客户顺序，后n仓库分配
         customer_order = individual[:n_customers]
         depot_assignments = individual[n_customers:]
 
         total_distance = 0
         current_load = 0
-        depot_0_idx = self.depot_indices[0]  # 主仓库索引
-        # 从主仓库出发
+        depot_0_idx = self.depot_indices[0]
         current_position = depot_0_idx
 
-        # 按客户顺序访问，但需要根据仓库分配组织路线
         for i, customer_idx in enumerate(customer_order):
+            # 生成随机需求
+            mean_demand = self.customers.iloc[customer_idx]['DEMAND']
+            actual_demand = self._generate_demand(mean_demand)
+
             assigned_depot_no = depot_assignments[customer_idx]
             assigned_depot_idx = self.depot_indices[assigned_depot_no]
-            customer_demand = self.customers.iloc[customer_idx]['DEMAND']
 
-            # 检查如果服务这个客户是否会超载
-            if current_load + customer_demand > self.max_capacity:
-                # 超载，需要返回主仓库清空
+            # 检查容量约束
+            if current_load + actual_demand > self.max_capacity:
+                # 返回主仓库清空
                 total_distance += self.distance_matrix[current_position][depot_0_idx]
                 current_load = 0
                 current_position = depot_0_idx
 
-            # 如果当前不在客户分配的仓库区域，需要先去该仓库
-            if current_position != assigned_depot_idx and current_position != customer_idx:
+            # 如果当前不在客户分配的仓库，先去该仓库
+            if current_position != assigned_depot_idx:
                 total_distance += self.distance_matrix[current_position][assigned_depot_idx]
                 current_position = assigned_depot_idx
 
-            # 从分配的仓库到客户
+            # 从仓库到客户
             total_distance += self.distance_matrix[current_position][customer_idx]
-            current_load += customer_demand
+            current_load += actual_demand
             current_position = customer_idx
 
         # 最后返回主仓库
         total_distance += self.distance_matrix[current_position][depot_0_idx]
 
-        return total_distance,
+        return total_distance
+
+    def _evaluate_route(self, individual, num_samples=10):
+        # 随机需求下的适应度评估，通过多次采样求期望距离
+        total_samples_distance = 0
+
+        for sample in range(num_samples):
+            sample_distance= self._evaluate_single_sample(individual)
+            total_samples_distance += sample_distance
+        distance = total_samples_distance/num_samples
+        return distance,
+
 
     def _custom_crossover(self, ind1, ind2):
-        """自定义交叉操作"""
+        #自定义交叉操作
         n_customers = len(self.customers)
 
-        # 对客户顺序部分使用顺序交叉
         customer1 = ind1[:n_customers]
         customer2 = ind2[:n_customers]
 
-        # 对仓库分配部分使用均匀交叉
         depot1 = ind1[n_customers:]
         depot2 = ind2[n_customers:]
 
-        # 客户顺序交叉
+        # 客户-顺序交叉
         child1_customer, child2_customer = tools.cxOrdered(customer1, customer2)
 
-        # 仓库分配交叉
+        # 仓库-分配交叉
         for i in range(len(depot1)):
             if random.random() < 0.5:
                 depot1[i], depot2[i] = depot2[i], depot1[i]
 
-        # 组合成新个体
+        # 组合
         ind1[:] = child1_customer + depot1
         ind2[:] = child2_customer + depot2
-
         return ind1, ind2
 
     def _custom_mutation(self, individual):
-        """自定义变异操作"""
+        #自定义变异操作
         n_customers = len(self.customers)
 
-        # 客户顺序变异：交换两个客户位置
+        # 客户-顺序变异：交换两个客户位置
         if random.random() < 0.1:
             idx1, idx2 = random.sample(range(n_customers), 2)
             individual[idx1], individual[idx2] = individual[idx2], individual[idx1]
 
-        # 仓库分配变异：随机改变一个客户的仓库分配
+        # 仓库-分配变异：随机改变一个客户的仓库分配
         if random.random() < 0.1:
             idx = random.randint(0, n_customers - 1)
             individual[n_customers + idx] = random.randint(0, 4)
 
         return individual,
 
-    # def analyze_route(self, individual):
-    #     """分析多仓库路径"""
-    #     n_customers = len(self.customers)
-    #     customer_order = individual[:n_customers]
-    #     depot_assignments = individual[n_customers:]
-    #
-    #     sub_routes = []
-    #     current_route = []
-    #     total_distance = 0
-    #     current_load = 0
-    #     depot_0_idx = self.depot_indices[0]
-    #     current_position = depot_0_idx
-    #
-    #     print("\n仓库分配情况:")
-    #     for depot_no in range(5):
-    #         assigned_customers = [
-    #             self.customers.iloc[customer_order[i]]['NO']
-    #             for i in range(n_customers)
-    #             if depot_assignments[i] == depot_no
-    #         ]
-    #         print(f"  仓库{depot_no}: {len(assigned_customers)}个客户 - {assigned_customers}")
-    #
-    #     # 从主仓库出发
-    #     current_route.append(f"仓库0")
-    #
-    #     for i, customer_idx in enumerate(customer_order):
-    #         assigned_depot_no = depot_assignments[customer_idx]
-    #         assigned_depot_idx = self.depot_indices[assigned_depot_no]
-    #         customer_no = self.customers.iloc[customer_idx]['NO']
-    #         customer_demand = self.customers.iloc[customer_idx]['DEMAND']
-    #
-    #         if current_load + customer_demand > self.max_capacity:
-    #             # 返回主仓库
-    #             total_distance += self.distance_matrix[current_position][depot_0_idx]
-    #             current_route.append("返回仓库0")
-    #             sub_routes.append({
-    #                 'customers': current_route.copy(),
-    #                 'load': current_load,
-    #                 'distance': total_distance
-    #             })
-    #             current_route = ["仓库0"]
-    #             current_load = 0
-    #             current_position = depot_0_idx
-    #
-    #         # 前往分配的仓库（如果需要）
-    #         if current_position != assigned_depot_idx and current_position != customer_idx:
-    #             total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-    #             current_route.append(f"经过仓库{assigned_depot_no}")
-    #             current_position = assigned_depot_idx
-    #
-    #         # 访问客户
-    #         total_distance += self.distance_matrix[current_position][customer_idx]
-    #         current_load += customer_demand
-    #         current_route.append(f"客户{customer_no}(需求:{customer_demand})")
-    #         current_position = customer_idx
-    #
-    #     # 最后返回主仓库
-    #     total_distance += self.distance_matrix[current_position][depot_0_idx]
-    #     current_route.append("返回仓库0")
-    #     sub_routes.append({
-    #         'customers': current_route,
-    #         'load': current_load,
-    #         'distance': total_distance
-    #     })
-    #
-    #     return sub_routes, total_distance
-
     def solve(self):
-        print("----开始求解ass1:VRP----")
+        print("----开始求解VRP----")
         population = self.toolbox.population(n=POPULATION_SIZE)     # 创建初始种群
 
         # 评估初始种群适应度
@@ -285,11 +233,9 @@ class VRP_GA_Solver:
         return best_solution, best_fitness
 
     def visualize_route(self, solution, save_path=None):
-        """使用可视化器展示路径"""
         self.visualizer.visualize_route(solution, save_path)
 
     def plot_evolution(self, fitness_history, title="GAProcess"):
-        """使用可视化器绘制进化过程"""
         self.visualizer.plot_evolution(fitness_history, title)
 
 
@@ -304,31 +250,7 @@ def main():
     solver.visualize_route(best_solution, save_path='optimal_route.png')
     solver.plot_evolution(fitness_history)
 
-    # 打印详细路径信息
-    # print("\n" + "=" * 50)
-    # print("最优路径详情:")
-    # print("=" * 50)
-
-    # 使用分析方法
-    # sub_routes, total_distance = solver.analyze_route(best_solution)
-
-    # print(f"总行驶距离: {total_distance:.2f}")
-    # print(f"总行程数: {len(sub_routes)}")
-    # print()
-
-    # 启用详细输出
-    # for i, route_info in enumerate(sub_routes, 1):
-    #     customers = route_info['customers']
-    #     load = route_info['load']
-    #     distance = route_info['distance']
-    #
-    #     print(f"行程 {i}:")
-    #     print(f"  路径: {' -> '.join(customers)}")
-    #     print(f"  负载: {load}")
-    #     print(f"  距离: {distance:.2f}")
-    #     print()
-
 
 if __name__ == "__main__":
-    print("ass1")
+    print("ass2")
     main()

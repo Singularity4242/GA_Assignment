@@ -14,7 +14,7 @@ class DataProcessor:
         self.depot_indices = None
 
     def load_data(self):
-        """加载VRP数据"""
+        #加载VRP数据
         print("——————加载VRP数据——————")
         self.data = pd.read_csv(DATA_PATH)
 
@@ -70,6 +70,16 @@ class DataProcessor:
         print(f"仓库索引映射: {self.depot_indices}")
         return self.distance_matrix, self.depot_indices
 
+    #用于task3复制
+    def get_task3_customer(self):
+        addition_customer = self.customers.copy()
+        addition_customer['YCOORD'] += 150
+        addition_customer['NO'] += 100
+        # 合并
+        self.customers = pd.concat([self.customers, addition_customer], ignore_index=True)
+        return self.customers
+
+
     #-----获取客户数据-----
     def get_customers(self):
         if self.customers is None:
@@ -124,26 +134,37 @@ data_processor = DataProcessor()
 
 # 便捷函数
 def load_vrp_data():
-    return data_loader.load_data()
+    return data_processor.load_data()
 
 def get_customers():
-    return data_loader.get_customers()
+    return data_processor.get_customers()
 
 def get_depots():
-    return data_loader.get_depots()
+    return data_processor.get_depots()
 
 
 def get_main_depot():
-    return data_loader.get_main_depot()
+    return data_processor.get_main_depot()
 
 
 def compute_distances():
-    return data_loader.compute_distance_matrix()
+    return data_processor.compute_distance_matrix()
 
 
 def get_distance_matrix():
-    return data_loader.get_distance_matrix()
+    return data_processor.get_distance_matrix()
 
 
 def get_depot_indices():
-    return data_loader.get_depot_indices()
+    return data_processor.get_depot_indices()
+
+def main():
+    load_vrp_data()
+    print("1customer:")
+    print(data_processor.get_customers())
+    print("3customer:")
+    print(data_processor.get_task3_customer())
+
+if __name__ == "__main__":
+    print("test data process")
+    main()
