@@ -10,7 +10,7 @@ from utils import EarlyStopper
 from sklearn.cluster import KMeans
 
 class VRP_GA_Solver:
-    # 使用Kmean分类然后
+    # 使用Kmean分类然后.
     def __init__(self):
         self.max_capacity = MAX_CAPACITY
 
