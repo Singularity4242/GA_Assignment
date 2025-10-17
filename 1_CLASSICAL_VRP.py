@@ -9,7 +9,7 @@ from visualizer import VRPVisualizer
 from utils import EarlyStopper
 
 class VRP_GA_Solver:
-    # 为单辆车（容量200）寻找最优路线，服务100个客户
+    # 为1辆车（容量200）5个仓库寻找最优路线，服务100个客户
     def __init__(self):
         self.max_capacity = MAX_CAPACITY
 
@@ -41,20 +41,20 @@ class VRP_GA_Solver:
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))     #最小化问题，最小适应度
         creator.create("Individual", list, fitness=creator.FitnessMin)         #一个个体（染色体）表示一个可能得解，每个解有一个适应度属性
         self.toolbox = base.Toolbox()
-
-        n_customers = len(self.customers)
-
-        def create_individual():
-            customer_order = random.sample(range(n_customers), n_customers)     #客户顺序
-            depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]      #仓库顺序
-            return customer_order + depot_assignments
-
-        self.toolbox.register("individual", tools.initIterate, creator.Individual, create_individual)
+        self.toolbox.register("individual", tools.initIterate, creator.Individual, self._create_individual)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
         self.toolbox.register("evaluate", self._evaluate_route)
         self.toolbox.register("select", tools.selTournament, tournsize=3)
         self.toolbox.register("mate", self._custom_crossover)
         self.toolbox.register("mutate", self._custom_mutation)
+
+    def _create_individual(self):
+        # 染色体编码方式
+        n_customers = len(self.customers)
+        customer_order = random.sample(range(n_customers), n_customers)  # 客户顺序
+        depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]  # n个仓库顺序
+        return customer_order + depot_assignments  # 前n为客户顺序，后n为仓库顺序
+
 
     #适应度计算
     def _evaluate_route(self, individual):

@@ -40,7 +40,6 @@ class DataProcessor:
         print("——————计算距离矩阵——————")
         n_customers = len(self.customers)
         n_depots = len(self.depots)
-
         # 初始化距离矩阵
         self.distance_matrix = np.zeros((n_customers + n_depots, n_customers + n_depots))
 
@@ -68,6 +67,7 @@ class DataProcessor:
         }
 
         print(f"仓库索引映射: {self.depot_indices}")
+        print(self.distance_matrix.__sizeof__())
         return self.distance_matrix, self.depot_indices
 
     #用于task3复制
