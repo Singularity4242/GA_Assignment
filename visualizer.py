@@ -8,11 +8,11 @@ class VRPVisualizer:
         self.data_processor = data_processor
         self.customers = data_processor.get_customers()
         self.depots = data_processor.get_depots()
-        self.distance_matrix = data_processor.get_distance_matrix()
+        self.distance_matrix = data_processor.get_dist_matrix()
         self.depot_indices = data_processor.get_depot_indices()
 
     def visualize_route(self, solution, save_path=None):
-        """可视化最优路径"""
+        #可视化最优路径
         fig, ax = plt.subplots(figsize=(12, 8))
 
         # 绘制所有仓库
@@ -74,7 +74,7 @@ class VRPVisualizer:
         ax.grid(True, alpha=0.3)
 
         # 添加距离信息
-        distance = self._calculate_route_distance(solution)
+        distance = self._calculate_route_distance(solution, self.distance_matrix)
         ax.text(0.02, 0.98, f'total distance: {distance:.2f}', transform=ax.transAxes,
                 fontsize=12, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
@@ -87,8 +87,8 @@ class VRPVisualizer:
 
         plt.show()
 
-    def _calculate_route_distance(self, solution):
-        """计算路径距离（用于可视化）"""
+    def _calculate_route_distance(self, solution, distance_matrix):
+        #计算路径距离（用于可视化）
         n_customers = len(self.customers)
         customer_order = solution[:n_customers]
         depot_assignments = solution[n_customers:]
@@ -119,8 +119,8 @@ class VRPVisualizer:
         total_distance += self.distance_matrix[current_position][depot_0_idx]
         return total_distance
 
-    def plot_evolution(self, fitness_history, title="GA evolution process"):
-        """绘制进化过程"""
+    def visualize_process(self, fitness_history, title="GA evolution process"):
+        #绘制进化过程
         plt.figure(figsize=(10, 6))
         plt.plot(fitness_history, 'b-', linewidth=2)
         plt.xlabel('Evolution times')
@@ -130,24 +130,8 @@ class VRPVisualizer:
         plt.tight_layout()
         plt.show()
 
-    def plot_comparison(self, histories, labels, title="算法性能比较"):
-        """比较多个算法的进化过程"""
-        plt.figure(figsize=(12, 8))
-
-        colors = ['blue', 'red', 'green', 'orange', 'purple']
-        for i, (history, label) in enumerate(zip(histories, labels)):
-            plt.plot(history, color=colors[i % len(colors)], linewidth=2, label=label)
-
-        plt.xlabel('进化代数')
-        plt.ylabel('最优路径距离')
-        plt.title(title)
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.show()
-
     def visualize_route_task3(self, solution, clusters, cluster_centers=None, save_path=None):
-        """第三问可视化：保持原有风格，只添加簇中心点"""
+        #第三问可视化
         fig, ax = plt.subplots(figsize=(12, 8))
 
         # 绘制所有仓库（保持原样）
@@ -235,7 +219,7 @@ class VRPVisualizer:
         return distance
 
     def _calculate_clustered_route_distance_task3(self, solution, clusters):
-        """计算第三问聚类路径距离"""
+        #计算第三问聚类路径距离
         n_customers = len(self.customers)
         customer_order = solution[:n_customers]
         cluster_order = solution[n_customers:]
@@ -270,7 +254,7 @@ class VRPVisualizer:
         return total_distance
 
     def _get_cluster_of_customer(self, customer_idx, clusters):
-        """辅助方法：获取客户所属簇"""
+        #辅助方法：获取客户所属簇
         for cluster_id, customers in clusters.items():
             if customer_idx in customers:
                 return cluster_id

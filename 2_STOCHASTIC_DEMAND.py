@@ -6,37 +6,25 @@ from deap import base, creator, tools, algorithms
 from config import *
 from data_process import data_processor
 from visualizer import VRPVisualizer
-from utils import EarlyStopper
+# from utils import EarlyStopper
 
 class VRP_GA_Solver:
 
     def __init__(self):
         self.max_capacity = MAX_CAPACITY
-
-        # 使用数据加载器
         self.data_processor = data_processor
         self.data_processor.load_data()
-        self.data_processor.compute_distance_matrix()
 
-        # 获取数据
         self.customers = self.data_processor.get_customers()
         self.depots = self.data_processor.get_depots()
         self.main_depot = self.data_processor.get_main_depot()
-        self.distance_matrix = self.data_processor.get_distance_matrix()
+        self.distance_matrix = self.data_processor.cul_dist_matrix()
         self.depot_indices = self.data_processor.get_depot_indices()
-
-        # 初始化可视化器和早停器
         self.visualizer = VRPVisualizer(self.data_processor)
-        self.early_stopper = EarlyStopper(
-            patience=EARLY_STOP_PATIENCE,
-            threshold=CONVERGENCE_THRESHOLD,
-            min_generations=MIN_GENERATIONS
-        )
-        # 设置遗传算法
+
         self._setup_ga()
 
     def _setup_ga(self):
-        #----设置遗传算法参数和操作----
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))     #最小化问题，最小适应度
         creator.create("Individual", list, fitness=creator.FitnessMin)         #一个个体（染色体）表示一个可能得解，每个解有一个适应度属性
         self.toolbox = base.Toolbox()
@@ -55,7 +43,7 @@ class VRP_GA_Solver:
         return customer_order + depot_assignments  # 前n为客户顺序，后n为仓库顺序
 
     def _generate_demand(self, mean_demand):
-        #-----正态分布范围内生成需求-------
+        #正态分布范围内生成需求
         std_dev = 0.2 * mean_demand     #标准差
         random_demand = np.random.normal(mean_demand, std_dev)      # 生成正态分布随机数
         random_demand = max(1, int(round(random_demand)))       # 截断为正整数
@@ -200,16 +188,6 @@ class VRP_GA_Solver:
             current_best_fitness = best_ind.fitness.values[0]
             best_fitness.append(current_best_fitness)
 
-            # 早停机制检查（只在达到最小代数后检查）
-            should_stop, stop_info = self.early_stopper.should_stop(gen, current_best_fitness, best_fitness)
-
-            if should_stop:
-                print(f"早停触发！连续 {stop_info['patience']} 代没有显著改进")
-                print(f"在第 {gen} 代停止进化")
-                print(f"总改进: {stop_info['improvement_percent']:.1f}% "
-                      f"({best_fitness[0]:.1f} → {stop_info['best_fitness']:.1f})")
-                break
-
             # 打印进度
             if gen % 20 == 0:
                 status = "探索中" if gen < MIN_GENERATIONS else f"无改进:{no_improvement_count}"
@@ -219,7 +197,6 @@ class VRP_GA_Solver:
         best_solution = tools.selBest(population, 1)[0]
         best_distance = best_solution.fitness.values[0]
 
-        print(f"求解完成！")
         print(f"最终最优路径距离: {best_distance:.2f}")
         print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
 
@@ -230,23 +207,18 @@ class VRP_GA_Solver:
 
         return best_solution, best_fitness
 
-    def visualize_route(self, solution, save_path=None):
+    def visualize(self, solution, save_path=None):
         self.visualizer.visualize_route(solution, save_path)
 
-    def plot_evolution(self, fitness_history, title="GAProcess"):
-        self.visualizer.plot_evolution(fitness_history, title)
+    def evo_process(self, fitness_history, title="GAProcess"):
+        self.visualizer.visualize_process(fitness_history, title)
 
 
 def main():
-    # 创建求解器实例
     solver = VRP_GA_Solver()
-
-    # 求解VRP问题
     best_solution, fitness_history = solver.solve()
-
-    # 可视化结果
-    solver.visualize_route(best_solution, save_path='optimal_route.png')
-    solver.plot_evolution(fitness_history)
+    solver.visualize(best_solution, save_path='optimal_route.png')
+    solver.evo_process(fitness_history)
 
 
 if __name__ == "__main__":
