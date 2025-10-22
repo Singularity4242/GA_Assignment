@@ -112,11 +112,13 @@ def get_distance_matrix():
     return data_processor.get_distance_matrix()
 
 def main():
-    load_vrp_data()
-    print("1customer:")
-    print(data_processor.get_customers())
-    print("3customer:")
-    print(data_processor.get_task3_customer())
+    data_processor.load_data()
+    # print("1customer:")
+    # print(data_processor.get_customers())
+    # print("3customer:")
+    # print(data_processor.get_task3_customer())
+    data_processor.cul_dist_matrix()
+    print(data_processor.get_depot_indices())
 
 if __name__ == "__main__":
     print("test data process")

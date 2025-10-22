@@ -63,6 +63,7 @@ class VRP_GA_Solver:
         total_efficiency = 0
         current_load = 0
         depot_0_idx = self.depot_indices[0]  # 主仓库索引
+        di = 0
         # 从主仓库出发
         current_position = depot_0_idx
 

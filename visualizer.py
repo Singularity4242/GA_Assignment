@@ -7,12 +7,10 @@ class VRPVisualizer:
     def __init__(self, data_processor):
         self.data_processor = data_processor
         self.customers = data_processor.get_customers()
-        self.depots = data_processor.get_depots()
-        self.distance_matrix = data_processor.get_dist_matrix()
+        self.depots = data_processor.get_depots()   #5行，带坐标位置
         self.depot_indices = data_processor.get_depot_indices()
 
-    def visualize_route(self, solution, save_path=None):
-        #可视化最优路径
+    def visualize_route(self, solution, best_distance):
         fig, ax = plt.subplots(figsize=(12, 8))
 
         # 绘制所有仓库
@@ -29,38 +27,47 @@ class VRPVisualizer:
         customer_y = self.customers['YCOORD'].values
         ax.scatter(customer_x, customer_y, c='blue', s=50, alpha=0.7, label='customer')
 
-        # 分析路径获取实际路线
+        # 还原实际行驶路线
         n_customers = len(self.customers)
-        customer_order = solution[:n_customers]
-        depot_assignments = solution[n_customers:]
+        cust_order = solution[:n_customers]
+        cust_depots_order = solution[n_customers:]
 
-        # 绘制路线
-        depot_0_idx = self.depot_indices[0]
-        current_position = depot_0_idx
-        route_x = [self.depots[self.depots['NO'] == 0].iloc[0]['XCOORD']]
-        route_y = [self.depots[self.depots['NO'] == 0].iloc[0]['YCOORD']]
+        route_x = []
+        route_y = []
 
-        for i, customer_idx in enumerate(customer_order):
-            assigned_depot_no = depot_assignments[customer_idx]
-            assigned_depot_idx = self.depot_indices[assigned_depot_no]
+        # 起点：主仓库
+        main_depot = self.depots[self.depots['NO'] == 0].iloc[0]
+        cur_depot_idx = self.depot_indices[0]
+        cur_load = 0
+
+        route_x.append(main_depot['XCOORD'])
+        route_y.append(main_depot['YCOORD'])
+
+        for i, customer_idx in enumerate(cust_order):
+            cust_depot_no = cust_depots_order[customer_idx]
+            cust_depot_idx = self.depot_indices[cust_depot_no]
             customer = self.customers.iloc[customer_idx]
+            customer_demand = customer['DEMAND']
 
-            # 如果不在分配的仓库，先画到仓库的路线
-            if current_position != assigned_depot_idx:
-                depot = self.depots[self.depots['NO'] == assigned_depot_no].iloc[0]
-                route_x.extend([depot['XCOORD']])
-                route_y.extend([depot['YCOORD']])
-                current_position = assigned_depot_idx
+            # 判断是否需要去仓库
+            need_switch_depot = (cust_depot_idx != cur_depot_idx)
+            need_reload = (cur_load + customer_demand > 200)
+            if need_switch_depot or need_reload:
+                # 画去仓库的路线
+                depot = self.depots[self.depots['NO'] == cust_depot_no].iloc[0]
+                route_x.append(depot['XCOORD'])
+                route_y.append(depot['YCOORD'])
+                cur_depot_idx = cust_depot_idx
+                cur_load = 0
 
-            # 画到客户的路线
-            route_x.extend([customer['XCOORD']])
-            route_y.extend([customer['YCOORD']])
-            current_position = customer_idx
+            # 画去客户的路线
+            route_x.append(customer['XCOORD'])
+            route_y.append(customer['YCOORD'])
+            cur_load += customer_demand
 
         # 最后返回主仓库
-        main_depot = self.depots[self.depots['NO'] == 0].iloc[0]
-        route_x.extend([main_depot['XCOORD']])
-        route_y.extend([main_depot['YCOORD']])
+        route_x.append(main_depot['XCOORD'])
+        route_y.append(main_depot['YCOORD'])
 
         # 绘制路径线
         ax.plot(route_x, route_y, 'g-', alpha=0.6, linewidth=2, label='route')
@@ -74,50 +81,13 @@ class VRPVisualizer:
         ax.grid(True, alpha=0.3)
 
         # 添加距离信息
-        distance = self._calculate_route_distance(solution, self.distance_matrix)
-        ax.text(0.02, 0.98, f'total distance: {distance:.2f}', transform=ax.transAxes,
+        ax.text(0.02, 0.98, f'total distance: {best_distance:.2f}', transform=ax.transAxes,
                 fontsize=12, verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
         plt.tight_layout()
-
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"路径图已保存至: {save_path}")
-
         plt.show()
 
-    def _calculate_route_distance(self, solution, distance_matrix):
-        #计算路径距离（用于可视化）
-        n_customers = len(self.customers)
-        customer_order = solution[:n_customers]
-        depot_assignments = solution[n_customers:]
-
-        total_distance = 0
-        current_load = 0
-        depot_0_idx = self.depot_indices[0]
-        current_position = depot_0_idx
-
-        for i, customer_idx in enumerate(customer_order):
-            assigned_depot_no = depot_assignments[customer_idx]
-            assigned_depot_idx = self.depot_indices[assigned_depot_no]
-            customer_demand = self.customers.iloc[customer_idx]['DEMAND']
-
-            if current_load + customer_demand > 200:  # 使用默认容量
-                total_distance += self.distance_matrix[current_position][depot_0_idx]
-                current_load = 0
-                current_position = depot_0_idx
-
-            if current_position != assigned_depot_idx:
-                total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-                current_position = assigned_depot_idx
-
-            total_distance += self.distance_matrix[current_position][customer_idx]
-            current_load += customer_demand
-            current_position = customer_idx
-
-        total_distance += self.distance_matrix[current_position][depot_0_idx]
-        return total_distance
 
     def visualize_process(self, fitness_history, title="GA evolution process"):
         #绘制进化过程

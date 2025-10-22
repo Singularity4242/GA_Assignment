@@ -16,9 +16,10 @@ class VRP_GA_Solver:
         self.data_processor.load_data()
 
         self.customers = self.data_processor.get_customers()
-        self.depots = self.data_processor.get_depots()
-        self.distance_matrix = self.data_processor.cul_dist_matrix()
-        self.depot_indices = self.data_processor.get_depot_indices()
+        # self.main_depot = self.data_processor.get_main_depot()
+        #self.depots = self.data_processor.get_depots()
+        self.dist_matrix = self.data_processor.cul_dist_matrix()
+        self.depots_idx = self.data_processor.get_depot_indices()   #depots[0] =100,[1] = 101
         self.visualizer = VRPVisualizer(self.data_processor)
 
         self._setup_ga()
@@ -47,40 +48,34 @@ class VRP_GA_Solver:
 
         n_customers = len(self.customers)
         # 一条染色体：前n客户顺序，后n仓库分配
-        customer_order = individual[:n_customers]
-        depot_assignments = individual[n_customers:]
+        cust_order = individual[:n_customers]
+        cust_depots_order = individual[n_customers:]
 
         total_distance = 0
-        current_load = 0
-        depot_0_idx = self.depot_indices[0]  # 主仓库索引
-        # 从主仓库出发
-        current_position = depot_0_idx
+        cur_load = 0
+        cur_depot_idx = self.depots_idx[0]
+        cur_position = self.depots_idx[0]
 
         # 按客户顺序访问，但需要根据仓库分配组织路线
-        for i, customer_idx in enumerate(customer_order):
-            assigned_depot_no = depot_assignments[customer_idx]
-            assigned_depot_idx = self.depot_indices[assigned_depot_no]
+        for i, customer_idx in enumerate(cust_order):
+            cust_depot_no = cust_depots_order[customer_idx]
+            cust_depot_idx = self.depots_idx[cust_depot_no]
             customer_demand = self.customers.iloc[customer_idx]['DEMAND']
 
-            # 检查如果服务这个客户是否会超载
-            if current_load + customer_demand > self.max_capacity:
-                # 超载，需要返回主仓库清空
-                total_distance += self.distance_matrix[current_position][depot_0_idx]
-                current_load = 0
-                current_position = depot_0_idx
+            #如果再送会超载，或者和上一个不是同一个仓库，都需要先前往仓库
+            if (cust_depot_idx != cur_depot_idx) or (cur_load + customer_demand > self.max_capacity):
+                total_distance += self.dist_matrix[cur_position][cust_depot_idx]
+                cur_depot_idx = cust_depot_idx
+                cur_position = cur_depot_idx
+                cur_load = 0
 
-            # 如果当前不在客户分配的仓库区域，需要先去该仓库
-            if current_position != assigned_depot_idx and current_position != customer_idx:
-                total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-                current_position = assigned_depot_idx
-
-            # 从分配的仓库到客户
-            total_distance += self.distance_matrix[current_position][customer_idx]
-            current_load += customer_demand
-            current_position = customer_idx
+            # 从当前仓库到客户
+            total_distance += self.dist_matrix[cur_position][customer_idx]
+            cur_load += customer_demand
+            cur_position = customer_idx
 
         # 最后返回主仓库
-        total_distance += self.distance_matrix[current_position][depot_0_idx]
+        total_distance += self.dist_matrix[cur_position][self.depots_idx[0]]
 
         return total_distance,
 
@@ -180,17 +175,16 @@ class VRP_GA_Solver:
         best_distance = best_solution.fitness.values[0]
 
         print(f"最终最优路径距离: {best_distance:.2f}")
-        print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
 
         # 计算改进百分比
         initial_best = best_fitness[0] if best_fitness else best_distance
         improvement = ((initial_best - best_distance) / initial_best) * 100
         print(f"相对初始解的改进: {improvement:.1f}%")
 
-        return best_solution, best_fitness
+        return best_solution, best_fitness, best_distance
 
-    def visualize(self, solution, save_path=None):
-        self.visualizer.visualize_route(solution, save_path)
+    def visualize(self, solution, best_distance):
+        self.visualizer.visualize_route(solution, best_distance)
 
     def evo_process(self, fitness_history, title="GAProcess"):
         self.visualizer.visualize_process(fitness_history, title)
@@ -198,9 +192,9 @@ class VRP_GA_Solver:
 
 def main():
     solver = VRP_GA_Solver()
-    best_solution, fitness_history = solver.solve()
+    best_solution, fitness_history, best_distance = solver.solve()
 
-    solver.visualize(best_solution, save_path='optimal_route.png')
+    solver.visualize(best_solution, best_distance)
     solver.evo_process(fitness_history)
 
 
