@@ -6,7 +6,6 @@ from deap import base, creator, tools, algorithms
 from config import *
 from data_process import data_processor
 from visualizer import VRPVisualizer
-# from utils import EarlyStopper
 
 class VRP_GA_Solver:
 
@@ -18,8 +17,8 @@ class VRP_GA_Solver:
         self.customers = self.data_processor.get_customers()
         self.depots = self.data_processor.get_depots()
         self.main_depot = self.data_processor.get_main_depot()
-        self.distance_matrix = self.data_processor.cul_dist_matrix()
-        self.depot_indices = self.data_processor.get_depot_indices()
+        self.dist_matrix = self.data_processor.cul_dist_matrix()
+        self.depot_idx = self.data_processor.get_depot_indices()
         self.visualizer = VRPVisualizer(self.data_processor)
 
         self._setup_ga()
@@ -50,57 +49,40 @@ class VRP_GA_Solver:
         return random_demand
 
 
-    def _evaluate_single_sample(self, individual):
-        # 适应度评估（单次随机需求）
+    def _evaluate_route(self, individual):
+        # 适应度，取样单次随机需求
         n_customers = len(self.customers)
-        customer_order = individual[:n_customers]
-        depot_assignments = individual[n_customers:]
+        cust_order = individual[:n_customers]
+        cust_depots_order = individual[n_customers:]
 
         total_distance = 0
-        current_load = 0
-        depot_0_idx = self.depot_indices[0]
-        current_position = depot_0_idx
+        cur_load = 0
+        cur_depot_idx = self.depot_idx[0]
+        cur_position = self.depot_idx[0]
 
-        for i, customer_idx in enumerate(customer_order):
-            # 生成随机需求
-            mean_demand = self.customers.iloc[customer_idx]['DEMAND']
-            actual_demand = self._generate_demand(mean_demand)
+        for i, customer_idx in enumerate(cust_order):
+            cust_mean_demand = self.customers.iloc[customer_idx]['DEMAND']
+            cust_sample_demand = self._generate_demand(cust_mean_demand)
 
-            assigned_depot_no = depot_assignments[customer_idx]
-            assigned_depot_idx = self.depot_indices[assigned_depot_no]
+            cust_depot_no = cust_depots_order[customer_idx]
+            cust_depot_idx = self.depot_idx[cust_depot_no]
 
-            # 检查容量约束
-            if current_load + actual_demand > self.max_capacity:
-                # 返回主仓库清空
-                total_distance += self.distance_matrix[current_position][depot_0_idx]
-                current_load = 0
-                current_position = depot_0_idx
+            # 如果再送会超载，或者和上一个不是同一个仓库，都需要先前往仓库
+            if (cust_depot_idx != cur_depot_idx) or (cur_load + cust_sample_demand > self.max_capacity):
+                total_distance += self.dist_matrix[cur_position][cust_depot_idx]
+                cur_depot_idx = cust_depot_idx
+                cur_position = cur_depot_idx
+                cur_load = 0
 
-            # 如果当前不在客户分配的仓库，先去该仓库
-            if current_position != assigned_depot_idx:
-                total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-                current_position = assigned_depot_idx
-
-            # 从仓库到客户
-            total_distance += self.distance_matrix[current_position][customer_idx]
-            current_load += actual_demand
-            current_position = customer_idx
+            # 从当前仓库到客户
+            total_distance += self.dist_matrix[cur_position][customer_idx]
+            cur_load += cust_sample_demand
+            cur_position = customer_idx
 
         # 最后返回主仓库
-        total_distance += self.distance_matrix[current_position][depot_0_idx]
+        total_distance += self.dist_matrix[cur_position][self.depot_idx[0]]
 
-        return total_distance
-
-    def _evaluate_route(self, individual, num_samples=10):
-        # 随机需求下的适应度评估，通过多次采样求期望距离
-        total_samples_distance = 0
-
-        for sample in range(num_samples):
-            sample_distance= self._evaluate_single_sample(individual)
-            total_samples_distance += sample_distance
-        distance = total_samples_distance/num_samples
-        return distance,
-
+        return total_distance,
 
     def _custom_crossover(self, ind1, ind2):
         #自定义交叉操作
@@ -142,10 +124,8 @@ class VRP_GA_Solver:
         return individual,
 
     def solve(self):
-        print("----开始求解VRP----")
-        population = self.toolbox.population(n=POPULATION_SIZE)     # 创建初始种群
+        population = self.toolbox.population(n=POPULATION_SIZE)
 
-        # 评估初始种群适应度
         fitnesses = list(map(self.toolbox.evaluate, population))
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
@@ -153,7 +133,6 @@ class VRP_GA_Solver:
         # 记录进化过程
         best_fitness = []
         no_improvement_count = 0
-        best_so_far = float('inf')
 
         # 进化循环
         for gen in range(MAX_GENERATIONS):
@@ -198,17 +177,16 @@ class VRP_GA_Solver:
         best_distance = best_solution.fitness.values[0]
 
         print(f"最终最优路径距离: {best_distance:.2f}")
-        print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
 
         # 计算改进百分比
         initial_best = best_fitness[0] if best_fitness else best_distance
         improvement = ((initial_best - best_distance) / initial_best) * 100
         print(f"相对初始解的改进: {improvement:.1f}%")
 
-        return best_solution, best_fitness
+        return best_solution, best_fitness, best_distance
 
-    def visualize(self, solution, save_path=None):
-        self.visualizer.visualize_route(solution, save_path)
+    def visualize(self, solution, best_distance):
+        self.visualizer.visualize_route(solution, best_distance)
 
     def evo_process(self, fitness_history, title="GAProcess"):
         self.visualizer.visualize_process(fitness_history, title)
@@ -216,8 +194,8 @@ class VRP_GA_Solver:
 
 def main():
     solver = VRP_GA_Solver()
-    best_solution, fitness_history = solver.solve()
-    solver.visualize(best_solution, save_path='optimal_route.png')
+    best_solution, fitness_history, best_distance = solver.solve()
+    solver.visualize(best_solution, best_distance)
     solver.evo_process(fitness_history)
 
 

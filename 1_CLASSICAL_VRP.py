@@ -16,8 +16,6 @@ class VRP_GA_Solver:
         self.data_processor.load_data()
 
         self.customers = self.data_processor.get_customers()
-        # self.main_depot = self.data_processor.get_main_depot()
-        #self.depots = self.data_processor.get_depots()
         self.dist_matrix = self.data_processor.cul_dist_matrix()
         self.depots_idx = self.data_processor.get_depot_indices()   #depots[0] =100,[1] = 101
         self.visualizer = VRPVisualizer(self.data_processor)
@@ -60,10 +58,10 @@ class VRP_GA_Solver:
         for i, customer_idx in enumerate(cust_order):
             cust_depot_no = cust_depots_order[customer_idx]
             cust_depot_idx = self.depots_idx[cust_depot_no]
-            customer_demand = self.customers.iloc[customer_idx]['DEMAND']
+            cust_demand = self.customers.iloc[customer_idx]['DEMAND']
 
             #如果再送会超载，或者和上一个不是同一个仓库，都需要先前往仓库
-            if (cust_depot_idx != cur_depot_idx) or (cur_load + customer_demand > self.max_capacity):
+            if (cust_depot_idx != cur_depot_idx) or (cur_load + cust_demand > self.max_capacity):
                 total_distance += self.dist_matrix[cur_position][cust_depot_idx]
                 cur_depot_idx = cust_depot_idx
                 cur_position = cur_depot_idx
@@ -71,7 +69,7 @@ class VRP_GA_Solver:
 
             # 从当前仓库到客户
             total_distance += self.dist_matrix[cur_position][customer_idx]
-            cur_load += customer_demand
+            cur_load += cust_demand
             cur_position = customer_idx
 
         # 最后返回主仓库
@@ -121,9 +119,8 @@ class VRP_GA_Solver:
 
 
     def solve(self):
-        population = self.toolbox.population(n=POPULATION_SIZE)     # 创建初始种群
+        population = self.toolbox.population(n=POPULATION_SIZE)
 
-        # 评估初始种群适应度
         fitnesses = list(map(self.toolbox.evaluate, population))
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
