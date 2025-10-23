@@ -6,7 +6,7 @@ from deap import base, creator, tools, algorithms
 from config import *
 from data_process import data_processor
 from visualizer import VRPVisualizer
-from utils import EarlyStopper
+#from utils import EarlyStopper
 from sklearn.cluster import KMeans
 
 class VRP_GA_Solver:
@@ -19,8 +19,8 @@ class VRP_GA_Solver:
         self.customers = self.data_processor.get_task3_customer()
         self.depots = self.data_processor.get_depots()
         self.main_depot = self.data_processor.get_main_depot()
-        self.distance_matrix = self.data_processor.cul_dist_matrix()
-        self.depot_indices = self.data_processor.get_depot_indices()
+        self.dist_matrix = self.data_processor.cul_dist_matrix()
+        self.depot_idx = self.data_processor.get_depot_indices()
         self.visualizer = VRPVisualizer(self.data_processor)
         self._cluster_customers(n_clusters=5)
 
@@ -28,8 +28,8 @@ class VRP_GA_Solver:
 
 
     def _setup_ga(self):
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))     #最小化问题，最小适应度
-        creator.create("Individual", list, fitness=creator.FitnessMin)         #一个个体（染色体）表示一个可能得解，每个解有一个适应度属性
+        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMin)
         self.toolbox = base.Toolbox()
         self.toolbox.register("individual", tools.initIterate, creator.Individual, self._create_individual)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
@@ -40,10 +40,10 @@ class VRP_GA_Solver:
 
     # 聚类
     def _cluster_customers(self, n_clusters=5):
-        customer_coords = self.customers[['XCOORD','YCOORD']].values
+        cust_coords = self.customers[['XCOORD','YCOORD']].values
         kmeans = KMeans(n_clusters = n_clusters, random_state= 42)
-        cluster_labels = kmeans.fit_predict(customer_coords)
-        self.clusters = {}
+        cluster_labels = kmeans.fit_predict(cust_coords)
+        self.clusters = {}      #字典，键为簇编号，值为所在该簇的客户索引数组
         self.cluster_centers = kmeans.cluster_centers_
         for i, label in enumerate(cluster_labels):
             if label not in self.clusters:
@@ -74,33 +74,30 @@ class VRP_GA_Solver:
 
     def _evaluate_route(self, individual):
         total_distance = 0
-        current_load = 0
-        depot_0_idx = self.depot_indices[0]  # 主仓库索引
+        cur_load = 0
+        main_depot = self.depot_idx[0]  # 主仓库索引
 
         #解析染色体
         n_customers = len(self.customers)
         cluster_order = individual[n_customers:]
-        customer_order = individual[:n_customers]
-
-        current_position = depot_0_idx
+        cust_order = individual[:n_customers]
+        cur_position = main_depot
 
         for cluster_id in cluster_order:
-            cluster_customers = [cust for cust in customer_order
+            cluster_customers = [cust for cust in cust_order
                                  if self._get_cluster_of_customer(cust) == cluster_id]
-            for customer_idx in cluster_customers:
-                customer_demand = self.customers.iloc[customer_idx]['DEMAND']
-                #计算距离，检查容量
-                if current_load + customer_demand > self.max_capacity:
-                    # 超载，需要返回主仓库清空
-                    total_distance += self.distance_matrix[current_position][depot_0_idx]
-                    current_load = 0
-                    current_position = depot_0_idx
-                # 前往客户
-                total_distance += self.distance_matrix[current_position][customer_idx]
-                current_load += customer_demand
-                current_position = customer_idx
+            for cust_idx in cluster_customers:
+                cust_demand = self.customers.iloc[cust_idx]['DEMAND']
+                if cur_load + cust_demand > self.max_capacity:
+                    total_distance += self.dist_matrix[cur_position][main_depot]
+                    cur_position = main_depot
+                    cur_load = 0
 
-        total_distance += self.distance_matrix[current_position][depot_0_idx]
+                total_distance += self.dist_matrix[cur_position][cust_idx]
+                cur_load += cust_demand
+                cur_position = cust_idx
+
+        total_distance += self.dist_matrix[cur_position][main_depot]
         return total_distance,
 
     def _custom_crossover(self, ind1, ind2):
@@ -195,12 +192,12 @@ class VRP_GA_Solver:
         improvement = ((initial_best - best_distance) / initial_best) * 100
         print(f"相对初始解的改进: {improvement:.1f}%")
 
-        return best_solution, best_fitness
+        return best_solution, best_fitness, best_distance
 
-    def visualize_route(self, solution, save_path=None):
+    def visualize_route(self, solution, best_distance):
         self.visualizer.clusters = self.clusters
         self.visualizer.cluster_centers = self.cluster_centers
-        self.visualizer.visualize_route_task3(solution, self.clusters, self.cluster_centers, save_path)
+        self.visualizer.visualize_route_task3(solution, self.clusters, self.cluster_centers, best_distance)
 
     def plot_evolution(self, fitness_history, title="GAProcess"):
         self.visualizer.visualize_process(fitness_history, title)
@@ -208,8 +205,8 @@ class VRP_GA_Solver:
 
 def main():
     solver = VRP_GA_Solver()
-    best_solution, fitness_history = solver.solve()
-    solver.visualize_route(best_solution, save_path='optimal_route.png')
+    best_solution, fitness_history, best_distance = solver.solve()
+    solver.visualize_route(best_solution, best_distance)
     solver.plot_evolution(fitness_history)
 
 

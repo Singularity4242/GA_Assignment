@@ -38,7 +38,8 @@ class VRP_GA_Solver:
         n_customers = len(self.customers)
         customer_order = random.sample(range(n_customers), n_customers)  # 客户顺序
         depot_assignments = [random.randint(0, 4) for _ in range(n_customers)]  # n个仓库顺序
-        return customer_order + depot_assignments  # 前n为客户顺序，后n为仓库顺序
+        individual = customer_order + depot_assignments
+        return individual  # 前n为客户顺序，后n为仓库顺序
 
 
     #适应度计算
@@ -55,10 +56,10 @@ class VRP_GA_Solver:
         cur_position = self.depots_idx[0]
 
         # 按客户顺序访问，但需要根据仓库分配组织路线
-        for i, customer_idx in enumerate(cust_order):
-            cust_depot_no = cust_depots_order[customer_idx]
+        for i, cust_idx in enumerate(cust_order):
+            cust_depot_no = cust_depots_order[cust_idx]
             cust_depot_idx = self.depots_idx[cust_depot_no]
-            cust_demand = self.customers.iloc[customer_idx]['DEMAND']
+            cust_demand = self.customers.iloc[cust_idx]['DEMAND']
 
             #如果再送会超载，或者和上一个不是同一个仓库，都需要先前往仓库
             if (cust_depot_idx != cur_depot_idx) or (cur_load + cust_demand > self.max_capacity):
@@ -68,9 +69,9 @@ class VRP_GA_Solver:
                 cur_load = 0
 
             # 从当前仓库到客户
-            total_distance += self.dist_matrix[cur_position][customer_idx]
+            total_distance += self.dist_matrix[cur_position][cust_idx]
             cur_load += cust_demand
-            cur_position = customer_idx
+            cur_position = cust_idx
 
         # 最后返回主仓库
         total_distance += self.dist_matrix[cur_position][self.depots_idx[0]]
