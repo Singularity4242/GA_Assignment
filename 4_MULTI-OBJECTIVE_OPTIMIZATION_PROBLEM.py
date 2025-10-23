@@ -6,7 +6,6 @@ from deap import base, creator, tools, algorithms
 from config import *
 from data_process import data_processor
 from visualizer import VRPVisualizer
-#from utils import EarlyStopper
 
 class VRP_GA_Solver:
     # 为1辆车（容量200）5个仓库寻找最优路线，服务100个客户
@@ -18,8 +17,8 @@ class VRP_GA_Solver:
         self.customers = self.data_processor.get_customers()
         self.depots = self.data_processor.get_depots()
         self.main_depot = self.data_processor.get_main_depot()
-        self.distance_matrix = self.data_processor.cul_dist_matrix()
-        self.depot_indices = self.data_processor.get_depot_indices()
+        self.dist_matrix = self.data_processor.cul_dist_matrix()
+        self.depots_idx = self.data_processor.get_depot_indices()
         self.visualizer = VRPVisualizer(self.data_processor)
 
         self.mode = mode
@@ -55,48 +54,43 @@ class VRP_GA_Solver:
     #距离计算[适应度]
     def _get_fitness(self, individual):
         n_customers = len(self.customers)
-        # 一条染色体：前n客户顺序，后n仓库分配
-        customer_order = individual[:n_customers]
+        cust_order = individual[:n_customers]
         depot_assignments = individual[n_customers:]
 
         total_distance = 0
         total_efficiency = 0
-        current_load = 0
-        depot_0_idx = self.depot_indices[0]  # 主仓库索引
+        cur_load = 0
+        cur_depot_idx = self.depots_idx[0]
+        cur_position = self.depots_idx[0]
         di = 0
-        # 从主仓库出发
-        current_position = depot_0_idx
 
         # 按客户顺序访问，但需要根据仓库分配组织路线
-        for i, customer_idx in enumerate(customer_order):
-            assigned_depot_no = depot_assignments[customer_idx]
-            assigned_depot_idx = self.depot_indices[assigned_depot_no]
-            customer_demand = self.customers.iloc[customer_idx]['DEMAND']
-            eff_score = self.customers.iloc[customer_idx]['EFFICIENCY']
+        for i, cust_idx in enumerate(cust_order):
+            cust_depot_no = depot_assignments[cust_idx]
+            cust_depot_idx = self.depots_idx[cust_depot_no]
+            cust_demand = self.customers.iloc[cust_idx]['DEMAND']
+            eff_score = self.customers.iloc[cust_idx]['EFFICIENCY']
 
-            # 检查如果服务这个客户是否会超载
-            if current_load + customer_demand > self.max_capacity:
-                # 超载，返回主仓库
-                total_distance += self.distance_matrix[current_position][depot_0_idx]
-                current_load = 0
-                current_position = depot_0_idx
+            # 如果再送会超载，或者和上一个不是同一个仓库，都需要先前往仓库
+            if (cust_depot_idx != cur_depot_idx) or (cur_load + cust_demand > self.max_capacity):
+                total_distance += self.dist_matrix[cur_position][cust_depot_idx]
+                cur_depot_idx = cust_depot_idx
+                cur_position = cur_depot_idx
+                cur_load = 0
+                di = 0
 
-            # 如果当前不在客户分配的仓库区域，需要先去该仓库
-            if current_position != assigned_depot_idx and current_position != customer_idx:
-                total_distance += self.distance_matrix[current_position][assigned_depot_idx]
-                current_position = assigned_depot_idx
-
-            # 从分配的仓库到客户
-            total_distance += self.distance_matrix[current_position][customer_idx]
-            current_load += customer_demand
-            current_position = customer_idx
+            # 从当前仓库到客户
+            total_distance += self.dist_matrix[cur_position][cust_idx]
+            di += self.dist_matrix[cur_position][cust_idx]
+            cur_load += cust_demand
+            cur_position = cust_idx
 
             #计算效率
-            customer_eff = eff_score - total_distance
+            customer_eff = eff_score - di
             total_efficiency += customer_eff
 
         # 最后返回主仓库
-        total_distance += self.distance_matrix[current_position][depot_0_idx]
+        total_distance += self.dist_matrix[cur_position][self.depots_idx[0]]
 
         if self.mode == 'weighted':
             fitness = self._weighted(total_distance, total_efficiency, self.weight)
@@ -159,7 +153,6 @@ class VRP_GA_Solver:
             ind.fitness.values = fit
 
         best_fitness = []
-        no_improvement_count = 0
 
         for gen in range(MAX_GENERATIONS):
             # 选择
@@ -221,13 +214,13 @@ class VRP_GA_Solver:
 
         return best_solution, best_fitness
 
-    def visualize_route(self, solution, save_path=None):
-        self.visualizer.visualize_route(solution, save_path)
+    def visualize_route(self, solution, best_distance):
+        self.visualizer.visualize_route(solution, best_distance)
 
     def plot_evolution(self, fitness_history, title="GAProcess"):
         self.visualizer.visualize_process(fitness_history, title)
 
-    def visualize_pareto_front(self, pareto_front, save_path=None):
+    def visualize_pareto_front(self, pareto_front):
         """可视化帕累托前沿"""
         # 提取目标值
         distances = [ind.fitness.values[0] for ind in pareto_front]
@@ -251,8 +244,8 @@ class VRP_GA_Solver:
 
         plt.legend()
 
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        # if save_path:
+        #     plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
 
 
@@ -261,16 +254,16 @@ def main():
     if method == 'weighted':
         solver = VRP_GA_Solver(mode = 'weighted', weight=0.7)
         best_solution, fitness_history = solver.solve()
-        solver.visualize_route(best_solution, save_path='optimal_route.png')
+        solver.visualize_route(best_solution, best_distance)
         solver.plot_evolution(fitness_history)
     elif method == 'nsgaii':
         solver = VRP_GA_Solver(mode='nsgaii')
-        pareto_front, fitness_history = solver.solve()
+        pareto_front, best_fitness= solver.solve()
         # 多目标可视化
-        solver.visualize_pareto_front(pareto_front, save_path='pareto_front.png')
+        solver.visualize_pareto_front(pareto_front)
         # 可视化解
         print(f"找到 {len(pareto_front)} 个帕累托解")
-        solver.visualize_route(pareto_front[0], save_path='nsgaii_route.png')
+        solver.visualize_route(pareto_front[0])
 
 
 
