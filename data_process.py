@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import random
 from config import DATA_PATH
 
 
@@ -71,6 +72,17 @@ class DataProcessor:
         addition_customer['NO'] += 100
         # 合并
         self.custs = pd.concat([self.custs, addition_customer], ignore_index=True)
+        return self.custs
+
+    def get_task5_customer(self):
+        #修改客户需求，使30%的客户具有负需求
+        n_custs = len(self.custs)
+        change = int(n_custs * 0.3)
+        change_idx = random.sample(range(n_custs), change)
+
+        for idx in change_idx:
+            original_demand = self.custs.iloc[idx]['DEMAND']
+            self.custs.iloc[idx, self.custs.columns.get_loc('DEMAND')] = -original_demand
         return self.custs
 
     def get_dist_matrix(self):

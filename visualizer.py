@@ -174,6 +174,68 @@ class VRPVisualizer:
         plt.tight_layout()
         plt.show()
 
+    def visualize_route_task5(self, solution, best_distance):
+        fig, ax = plt.subplots(figsize=(12, 8))
+        main_depot = self.depots[self.depots['NO'] == 0].iloc[0]
+        depot_x, depot_y = main_depot['XCOORD'], main_depot['YCOORD']
+        ax.scatter(depot_x, depot_y, c='red', s=200, marker='s', edgecolors='black')
+        ax.text(depot_x, depot_y + 2, 'main_depot', ha='center', fontsize=10, weight='bold')
+        ax.scatter(self.customers['XCOORD'], self.customers['YCOORD'], c='blue', s=50, alpha=0.7, label='customer')
+
+        # 还原实际行驶路线
+        n_customers = len(self.customers)
+        cust_order = solution[:n_customers]
+
+        route_x = []
+        route_y = []
+
+        # 起点：主仓库
+        main_depot = self.depots[self.depots['NO'] == 0].iloc[0]
+        cur_load = 0
+
+        route_x.append(main_depot['XCOORD'])
+        route_y.append(main_depot['YCOORD'])
+
+        for i, customer_idx in enumerate(cust_order):
+            customer = self.customers.iloc[customer_idx]
+            cust_demand = customer['DEMAND']
+
+            # 判断是否需要去仓库
+            need_reload = (abs(cur_load + cust_demand) > 200)
+            if need_reload:
+                # 画去仓库的路线
+                depot = self.depots[self.depots['NO'] == 0].iloc[0]
+                route_x.append(depot['XCOORD'])
+                route_y.append(depot['YCOORD'])
+                cur_load = 0
+
+            # 画去客户的路线
+            route_x.append(customer['XCOORD'])
+            route_y.append(customer['YCOORD'])
+            cur_load += cust_demand
+
+        # 最后返回主仓库
+        route_x.append(main_depot['XCOORD'])
+        route_y.append(main_depot['YCOORD'])
+
+        # 绘制路径线
+        ax.plot(route_x, route_y, 'g-', alpha=0.6, linewidth=2, label='route')
+        ax.plot(route_x, route_y, 'go', alpha=0.6, markersize=4)
+
+        # 美化图形
+        ax.set_xlabel('X Axis')
+        ax.set_ylabel('Y Axis')
+        ax.set_title('PICK_UP_DELIVERY')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        # 添加距离信息
+        ax.text(0.02, 0.98, f'total distance: {best_distance:.2f}', transform=ax.transAxes,
+                fontsize=12, verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+        plt.tight_layout()
+        plt.show()
 
     def _get_cluster_of_customer(self, customer_idx, clusters):
         #辅助方法：获取客户所属簇
