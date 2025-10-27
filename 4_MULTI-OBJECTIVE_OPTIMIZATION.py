@@ -9,7 +9,7 @@ from visualizer import VRPVisualizer
 
 class VRP_GA_Solver:
     # 为1辆车（容量200）5个仓库寻找最优路线，服务100个客户
-    def __init__(self, mode= 'weighted', weight = 0.5):
+    def __init__(self, mode= 'weighted', weight = 1.0):
         self.max_capacity = MAX_CAPACITY
         self.data_processor = data_processor
         self.data_processor.load_data()
@@ -27,11 +27,11 @@ class VRP_GA_Solver:
 
     def _setup_ga(self):
         if self.mode == 'weighted':
-            print("使用单目标加权")
+            print("---weighted running---")
             creator.create("FitnessMin", base.Fitness, weights=(-1.0,))     #最小化问题，最小适应度
             creator.create("Individual", list, fitness=creator.FitnessMin)         #一个个体（染色体）表示一个可能得解，每个解有一个适应度属性
         elif self.mode == 'nsgaii':
-            print("使用nsgaii")
+            print("---nsgaii running---")
             creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0))  # 最小化问题，最小适应度
             creator.create("Individual", list, fitness=creator.FitnessMulti)  # 一个个体（染色体）表示一个可能得解，每个解有一个适应度属性
 
@@ -91,6 +91,10 @@ class VRP_GA_Solver:
 
         # 最后返回主仓库
         total_distance += self.dist_matrix[cur_position][self.depots_idx[0]]
+
+        # 保存原始目标值到个体属性中
+        individual.raw_distance = total_distance
+        individual.raw_efficiency = total_efficiency
 
         if self.mode == 'weighted':
             fitness = self._weighted(total_distance, total_efficiency, self.weight)
@@ -192,8 +196,16 @@ class VRP_GA_Solver:
                 current_best_fitness = best_ind.fitness.values[0]
             best_fitness.append(current_best_fitness)
 
-            if gen % 20 == 0:
-                print(f" {gen:3d} 探索中")
+            if gen % 10 == 0:
+                #print(f" {gen:3d} 探索中")
+                if self.mode == 'weighted':
+                    #print(f"第 {gen:3d} 代 | current_best_fitness: {current_best_fitness:8.2f} ")
+                    # 获取当前最优解的原始目标值
+                    best_ind = tools.selBest(population, 1)[0]
+                    current_distance = best_ind.raw_distance
+                    current_efficiency = best_ind.raw_efficiency
+                    current_fitness = best_ind.fitness.values[0]
+                    print(f"{gen:3d} generation | weighted fitness: {current_fitness:8.2f} | distance: {current_distance:8.2f} | efficiency: {current_efficiency:8.2f}")
                 # status = "探索中" if gen < MIN_GENERATIONS else f"无改进:{no_improvement_count}"
                 # print(f" {gen:3d} generation | fitness: {current_best_fitness:8.2f} | 状态: {status}")
         # 获取最终最优解
@@ -203,15 +215,18 @@ class VRP_GA_Solver:
            return pareto_front, best_fitness
         else:
             best_solution = tools.selBest(population, 1)[0]
-            best_distance = best_solution.fitness.values[0]
-            print(f"最终最优路径距离: {best_distance:.2f}")
-            print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
-
+            best_solution_value = best_solution.fitness.values[0]
+            best_distance = best_solution.raw_distance
+            # print(f"final best fitness: {best_distance:.2f}")
+            # print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
+            # print(f"final finess: {best_solution_value:.2f}")
+            # print(f"final total distance: {best_solution.raw_distance:.2f}")
+            # print(f"final total efficiency: {best_solution.raw_efficiency:.2f}")
+            #print(f"总进化代数: {len(best_fitness)}/{MAX_GENERATIONS}")
         # 计算改进
-        initial_best = best_fitness[0] if best_fitness else best_distance
-        improvement = ((initial_best - best_distance) / initial_best) * 100
-        print(f"相对初始解的改进: {improvement:.1f}%")
-
+        # initial_best = best_fitness[0] if best_fitness else best_distance
+        # improvement = ((initial_best - best_distance) / initial_best) * 100
+        # print(f"相对初始解的改进: {improvement:.1f}%")
         return best_solution, best_fitness
 
     def visualize_route(self, solution, best_distance):
@@ -254,8 +269,12 @@ def main():
     if method == 'weighted':
         solver = VRP_GA_Solver(mode = 'weighted', weight=0.7)
         best_solution, fitness_history = solver.solve()
-        solver.visualize_route(best_solution, best_distance)
-        solver.plot_evolution(fitness_history)
+        #solver.visualize_route(best_solution, best_distance)
+        #solver.plot_evolution(fitness_history)
+        print(f"---Final Result----")
+        print(f"total distance: {best_solution.raw_distance:.2f}")
+        print(f"total efficiency: {best_solution.raw_efficiency:.2f}")
+        print(f"fitness: {best_solution.fitness.values[0]:.2f}")
     elif method == 'nsgaii':
         solver = VRP_GA_Solver(mode='nsgaii')
         pareto_front, best_fitness= solver.solve()
@@ -268,5 +287,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print("ass4")
+    print("---Task 4 running----")
     main()

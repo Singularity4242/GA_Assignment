@@ -42,15 +42,14 @@ class VRP_GA_Solver:
         return customer_order + depot_assignments  # 前n为客户顺序，后n为仓库顺序
 
     def _generate_demand(self, mean_demand):
-        #正态分布范围内生成需求
-        std_dev = 0.2 * mean_demand     #标准差
-        random_demand = np.random.normal(mean_demand, std_dev)      # 生成正态分布随机数
-        random_demand = max(1, int(round(random_demand)))       # 截断为正整数
+        #生成需求
+        std_dev = 0.2 * mean_demand
+        random_demand = np.random.normal(mean_demand, std_dev)
+        random_demand = max(1, int(round(random_demand)))
         return random_demand
 
 
     def _evaluate_route(self, individual):
-        # 适应度，取样单次随机需求
         n_customers = len(self.customers)
         cust_order = individual[:n_customers]
         cust_depots_order = individual[n_customers:]
@@ -74,49 +73,34 @@ class VRP_GA_Solver:
                 cur_position = cur_depot_idx
                 cur_load = 0
 
-            # 从当前仓库到客户
             total_distance += self.dist_matrix[cur_position][customer_idx]
             cur_load += cust_sample_demand
             cur_position = customer_idx
-
-        # 最后返回主仓库
         total_distance += self.dist_matrix[cur_position][self.depot_idx[0]]
 
         return total_distance,
 
     def _custom_crossover(self, ind1, ind2):
-        #自定义交叉操作
         n_customers = len(self.customers)
-
         customer1 = ind1[:n_customers]
         customer2 = ind2[:n_customers]
-
         depot1 = ind1[n_customers:]
         depot2 = ind2[n_customers:]
 
-        # 客户-顺序交叉
         child1_customer, child2_customer = tools.cxOrdered(customer1, customer2)
-
-        # 仓库-分配交叉
         for i in range(len(depot1)):
             if random.random() < 0.5:
                 depot1[i], depot2[i] = depot2[i], depot1[i]
 
-        # 组合
         ind1[:] = child1_customer + depot1
         ind2[:] = child2_customer + depot2
         return ind1, ind2
 
     def _custom_mutation(self, individual):
-        #自定义变异操作
         n_customers = len(self.customers)
-
-        # 客户-顺序变异：交换两个客户位置
         if random.random() < 0.1:
             idx1, idx2 = random.sample(range(n_customers), 2)
             individual[idx1], individual[idx2] = individual[idx2], individual[idx1]
-
-        # 仓库-分配变异：随机改变一个客户的仓库分配
         if random.random() < 0.1:
             idx = random.randint(0, n_customers - 1)
             individual[n_customers + idx] = random.randint(0, 4)
@@ -125,63 +109,55 @@ class VRP_GA_Solver:
 
     def solve(self):
         population = self.toolbox.population(n=POPULATION_SIZE)
-
         fitnesses = list(map(self.toolbox.evaluate, population))
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
 
-        # 记录进化过程
         best_fitness = []
         no_improvement_count = 0
-
-        # 进化循环
+        # 进化
         for gen in range(MAX_GENERATIONS):
-            # 选择下一代
+            # 选择
             offspring = self.toolbox.select(population, len(population))
             offspring = list(map(self.toolbox.clone, offspring))
 
-            # 交叉操作
+            # 交叉
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
                 if random.random() < CROSSOVER_PROB:
                     self.toolbox.mate(child1, child2)
                     del child1.fitness.values
                     del child2.fitness.values
 
-            # 变异操作
+            # 变异
             for mutant in offspring:
                 if random.random() < MUTATION_PROB:
                     self.toolbox.mutate(mutant)
                     del mutant.fitness.values
 
-            # 评估新个体
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = map(self.toolbox.evaluate, invalid_ind)
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
-
-            # 更新种群
+            # 更新
             population[:] = offspring
-
-            # 获取当前最优解
             best_ind = tools.selBest(population, 1)[0]
             current_best_fitness = best_ind.fitness.values[0]
             best_fitness.append(current_best_fitness)
 
-            # 打印进度
             if gen % 20 == 0:
-                status = "探索中" if gen < MIN_GENERATIONS else f"无改进:{no_improvement_count}"
-                print(f"第 {gen:3d} 代 | 最优距离: {current_best_fitness:8.2f} | 状态: {status}")
+                #status = "探索中" if gen < MIN_GENERATIONS else f"无改进:{no_improvement_count}"
+                print(f" {gen:3d} genration | total distance: {current_best_fitness:8.2f}")
 
         # 获取最终最优解
         best_solution = tools.selBest(population, 1)[0]
         best_distance = best_solution.fitness.values[0]
 
-        print(f"最终最优路径距离: {best_distance:.2f}")
+        print(f"final total distance: {best_distance:.2f}")
 
         # 计算改进百分比
         initial_best = best_fitness[0] if best_fitness else best_distance
         improvement = ((initial_best - best_distance) / initial_best) * 100
-        print(f"相对初始解的改进: {improvement:.1f}%")
+        print(f"Percent improvement: {improvement:.1f}%")
 
         return best_solution, best_fitness, best_distance
 
@@ -200,5 +176,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print("ass2")
+    print("----task2 running---")
     main()
