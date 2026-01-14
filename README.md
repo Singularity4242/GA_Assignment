@@ -104,34 +104,26 @@ pip install numpy pandas matplotlib deap scikit_learn
 
 **1_CLASSICAL_VRP.py**
 
-![image-20260114170234659](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170234659.png)
+![image-20260114170234659](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170234659.png)
 
-![image-20260114170257060](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170257060.png)
+![image-20260114170257060](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170257060.png)
 
 **2_STOCHASTIC_DEMAND.py**
 
-![image-20260114170315903](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170315903.png)
+![image-20260114170315903](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170315903.png)
 
-![image-20260114170323068](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170323068.png)
+![image-20260114170323068](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170315903.png)
 
 **3_LARGE_SCALE_OPTIMAZATION.py**
 
-![image-20260114170405879](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170405879.png)
+![image-20260114170405879](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170405879.png)
 
-![image-20260114170412015](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170412015.png)
+![image-20260114170412015](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170412015.png)
 
 **4_MULTI-OBJECTIVE_OPTIMAZATION.py**
 
- w = 0.2 (100 generations)
-
-![img](file:////Users/nicoleguo/Library/Containers/com.kingsoft.wpsoffice.mac.global/Data/tmp/wps-nicoleguo/ksohtml//wps1.jpg)
-
-Pareto Solutiones
-
-![img](file:////Users/nicoleguo/Library/Containers/com.kingsoft.wpsoffice.mac.global/Data/tmp/wps-nicoleguo/ksohtml//wps2.jpg)
-
 **5_PICKUP_DELIVERY.py**
 
-![image-20260114170533104](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170533104.png)
+![image-20260114170533104](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170533104.png)
 
-![image-20260114170540144](/Users/nicoleguo/Library/Application Support/typora-user-images/image-20260114170540144.png)
+![image-20260114170540144](https://github.com/Singularity4242/GA_Assignment/blob/main/imgs/image-20260114170540144.png)
